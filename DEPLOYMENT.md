@@ -50,20 +50,16 @@ postgresql://postgres:密码@数据库地址:5432/postgres
 STORAGE_TYPE=database
 NODE_ENV=production
 
-# 数据库配置
-DATABASE_URL=postgresql://username:password@host:port/database
-# 或使用 PGDATABASE_URL（coze-coding-dev-sdk 使用）
-PGDATABASE_URL=postgresql://username:password@host:port/database
+# 数据库配置（使用 Supabase）
+PGDATABASE_URL=postgresql://postgres.kasisvmybixdjdmtnets:iY8HLsPxEoX35iyZ@aws-0-ap-northeast-1.pooler.supabase.com:6543/postgres
 ```
 
-**示例**：
-```bash
-STORAGE_TYPE=database
-NODE_ENV=production
-DATABASE_URL=postgresql://postgres:MyPass123!@gz-cdb-xxx.postgres.tencentcdb.com:5432/postgres
-```
+**重要说明**：
+- 数据库表会在首次使用时自动创建，无需手动初始化
+- 使用 `PGDATABASE_URL` 而不是 `DATABASE_URL`（coze-coding-dev-sdk 要求）
+- Supabase 连接使用 Session Mode（端口 6543）
 
-### 3. 构建和部署
+### 4. 构建和部署
 
 #### 方式一：通过 EdgeOne 控制台
 
@@ -75,8 +71,10 @@ DATABASE_URL=postgresql://postgres:MyPass123!@gz-cdb-xxx.postgres.tencentcdb.com
    - 构建命令：`pnpm build`
    - 输出目录：`.next`
    - 安装命令：`pnpm install`
+   - Node.js 版本：`20.x`
 6. 添加环境变量（见上方）
 7. 点击"部署"
+8. **数据库会在首次访问时自动初始化，无需手动操作**
 
 #### 方式二：使用 CLI 部署
 
@@ -91,22 +89,14 @@ edgeone login
 edgeone deploy
 ```
 
-### 4. 数据库初始化
-
-部署完成后，访问以下 URL 初始化数据库：
-
-```
-https://your-domain.com/api/init-db
-```
-
-这将自动创建所需的数据库表和索引。
-
-### 5. 验证部署
+### 4. 验证部署
 
 1. 访问你的应用 URL
-2. 尝试添加一个产品
+2. 尝试添加一个产品（数据库表会自动创建）
 3. 检查产品是否成功保存
 4. 测试导出/导入功能
+
+**注意**：首次添加产品时可能需要几秒钟来创建数据库表，这是正常的。
 
 ## 常见问题
 
@@ -124,12 +114,14 @@ https://your-domain.com/api/init-db
 - 检查 Node.js 版本（推荐 20.x）
 - 清除缓存后重新构建
 
-### 问题 3：添加产品失败
+### 问题 3：首次添加产品较慢
 
-**解决方案：**
-- 访问 `/api/init-db` 初始化数据库
-- 检查数据库表是否正确创建
-- 查看应用日志获取详细错误信息
+**原因**：首次操作时需要创建数据库表
+
+**解决方案**：
+- 这是正常现象，只在首次使用时发生
+- 后续操作会很快
+- 数据库表创建后会自动缓存
 
 ## 性能优化建议
 

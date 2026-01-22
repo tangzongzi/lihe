@@ -45,23 +45,15 @@ STORAGE_TYPE=database
 # STORAGE_TYPE=file
 ```
 
-### 3. 初始化数据库
-
-如果使用数据库存储，启动应用后访问：
-
-```
-http://localhost:3000/api/init-db
-```
-
-这将自动创建所需的数据库表。
-
-### 4. 启动开发服务器
+### 3. 启动开发服务器
 
 ```bash
 pnpm dev
 ```
 
 访问 [http://localhost:3000](http://localhost:3000) 查看应用。
+
+**注意**：如果使用数据库存储，首次添加产品时会自动创建数据库表。
 
 ## 项目结构
 
@@ -138,9 +130,9 @@ pnpm dev
 
 1. 推送代码到 GitHub
 2. 在 EdgeOne 控制台连接仓库
-3. 配置环境变量
+3. 配置环境变量（`STORAGE_TYPE=database` 和 `PGDATABASE_URL`）
 4. 点击部署
-5. 访问 `/api/init-db` 初始化数据库
+5. 首次使用时数据库表会自动创建
 
 ### Vercel 部署
 
@@ -193,9 +185,9 @@ pnpm ts-check
 ### 1. 添加产品失败
 
 **解决方案**：
-- 确保已访问 `/api/init-db` 初始化数据库
 - 检查数据库连接是否正常
 - 查看浏览器控制台和服务器日志
+- 首次使用时数据库表会自动创建，可能需要几秒钟
 
 ### 2. 数据丢失
 

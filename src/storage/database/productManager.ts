@@ -1,10 +1,14 @@
-import { eq, like, sql, and, SQL } from "drizzle-orm"
+import { eq, like, and, SQL } from "drizzle-orm"
 import { getDb } from "coze-coding-dev-sdk"
 import { products, insertProductSchema, updateProductSchema } from "./shared/schema"
 import type { Product, InsertProduct, UpdateProduct } from "./shared/schema"
+import { ensureDbInitialized } from "./dbInit"
 
 export class ProductManager {
   async createProduct(data: InsertProduct): Promise<Product> {
+    // 确保数据库已初始化
+    await ensureDbInitialized()
+    
     const db = await getDb()
 
     console.log('ProductManager.createProduct - 输入数据:', data)
@@ -33,6 +37,9 @@ export class ProductManager {
     limit?: number
     search?: string
   } = {}): Promise<Product[]> {
+    // 确保数据库已初始化
+    await ensureDbInitialized()
+    
     const { skip = 0, limit = 100, search } = options
     const db = await getDb()
 
@@ -61,12 +68,18 @@ export class ProductManager {
   }
 
   async getProductById(id: string): Promise<Product | null> {
+    // 确保数据库已初始化
+    await ensureDbInitialized()
+    
     const db = await getDb()
     const [product] = await db.select().from(products).where(eq(products.id, id))
     return product || null
   }
 
   async updateProduct(id: string, data: UpdateProduct): Promise<Product | null> {
+    // 确保数据库已初始化
+    await ensureDbInitialized()
+    
     const db = await getDb()
 
     // 验证数据
@@ -96,6 +109,9 @@ export class ProductManager {
   }
 
   async deleteProduct(id: string): Promise<boolean> {
+    // 确保数据库已初始化
+    await ensureDbInitialized()
+    
     const db = await getDb()
     const result = await db.delete(products).where(eq(products.id, id))
     return (result.rowCount ?? 0) > 0
