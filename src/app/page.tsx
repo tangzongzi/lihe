@@ -159,6 +159,8 @@ export default function GiftBoxCalculator() {
     setIsRecognizing(true);
 
     try {
+      console.log('开始识别文字:', recognitionText);
+      
       const response = await fetch('/api/text-recognize', {
         method: 'POST',
         headers: {
@@ -167,23 +169,36 @@ export default function GiftBoxCalculator() {
         body: JSON.stringify({ text: recognitionText }),
       });
 
+      console.log('识别响应状态:', response.status, response.statusText);
+
       if (response.ok) {
         const result = await response.json();
+        console.log('识别结果:', result);
+        
+        let hasData = false;
         
         if (result.title) {
           setAddProductForm(prev => ({ ...prev, name: result.title }));
+          hasData = true;
         }
         if (result.price) {
           setAddProductForm(prev => ({ ...prev, supplierPrice: result.price }));
+          hasData = true;
         }
         
-        alert('识别成功！已自动填充产品信息');
+        if (hasData) {
+          alert('识别成功！已自动填充产品信息');
+        } else {
+          alert('未能识别出产品信息，请检查文字格式或手动填写');
+        }
       } else {
-        alert('识别失败，请稍后重试');
+        const errorData = await response.json().catch(() => ({ error: '服务器错误' }));
+        console.error('识别失败:', errorData);
+        alert(`识别失败：${errorData.error || '请稍后重试'}`);
       }
     } catch (error) {
       console.error('文字识别失败:', error);
-      alert('文字识别失败，请稍后重试');
+      alert(`文字识别失败：${error instanceof Error ? error.message : '网络错误'}`);
     } finally {
       setIsRecognizing(false);
     }
