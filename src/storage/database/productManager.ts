@@ -1,117 +1,104 @@
-import { eq, like, and, SQL } from "drizzle-orm"
+import { eq, like, desc } from "drizzle-orm"
 import { getDb } from "coze-coding-dev-sdk"
 import { products, insertProductSchema, updateProductSchema } from "./shared/schema"
 import type { Product, InsertProduct, UpdateProduct } from "./shared/schema"
-import { ensureDbInitialized } from "./dbInit"
 
 export class ProductManager {
+  /**
+   * 创建产品
+   */
   async createProduct(data: InsertProduct): Promise<Product> {
-    // 确保数据库已初始化
-    await ensureDbInitialized()
-    
     const db = await getDb()
 
-    console.log('ProductManager.createProduct - 输入数据:', data)
-
-    // 验证数据
+    // 验证输入数据
     const validated = insertProductSchema.parse(data)
-    console.log('ProductManager.createProduct - 验证通过数据:', validated)
 
-    // 转换为数据库期望的格式
-    const dbData: any = {
-      name: validated.name,
-      supplierPrice: validated.supplierPrice,
-      shopPrice: validated.shopPrice || null,
-    }
-
-    console.log('ProductManager.createProduct - 数据库数据:', dbData)
-
-    const [product] = await db.insert(products).values(dbData).returning()
-    console.log('ProductManager.createProduct - 创建成功:', product)
+    // 插入数据库
+    const [product] = await db
+      .insert(products)
+      .values({
+        name: validated.name,
+        supplierPrice: validated.supplierPrice,
+        shopPrice: validated.shopPrice || null,
+      })
+      .returning()
 
     return product
   }
 
+  /**
+   * 获取产品列表
+   */
   async getProducts(options: {
     skip?: number
     limit?: number
     search?: string
   } = {}): Promise<Product[]> {
-    // 确保数据库已初始化
-    await ensureDbInitialized()
-    
     const { skip = 0, limit = 100, search } = options
     const db = await getDb()
 
-    const conditions: SQL[] = []
+    let query = db.select().from(products)
 
-    if (search && search.trim()) {
-      conditions.push(like(products.name, `%${search.trim()}%`))
+    // 搜索过滤
+    if (search?.trim()) {
+      query = query.where(like(products.name, `%${search.trim()}%`))
     }
 
-    if (conditions.length > 0) {
-      return db
-        .select()
-        .from(products)
-        .where(and(...conditions))
-        .limit(limit)
-        .offset(skip)
-        .orderBy(products.createdAt)
-    }
-
-    return db
-      .select()
-      .from(products)
+    // 排序和分页
+    const result = await query
+      .orderBy(desc(products.createdAt))
       .limit(limit)
       .offset(skip)
-      .orderBy(products.createdAt)
+
+    return result
   }
 
+  /**
+   * 根据 ID 获取产品
+   */
   async getProductById(id: string): Promise<Product | null> {
-    // 确保数据库已初始化
-    await ensureDbInitialized()
-    
     const db = await getDb()
-    const [product] = await db.select().from(products).where(eq(products.id, id))
+    const [product] = await db
+      .select()
+      .from(products)
+      .where(eq(products.id, id))
+      .limit(1)
+
     return product || null
   }
 
+  /**
+   * 更新产品
+   */
   async updateProduct(id: string, data: UpdateProduct): Promise<Product | null> {
-    // 确保数据库已初始化
-    await ensureDbInitialized()
-    
     const db = await getDb()
 
-    // 验证数据
+    // 验证输入数据
     const validated = updateProductSchema.parse(data)
 
-    // 转换为数据库期望的格式
-    const dbData: Record<string, any> = {
+    // 构建更新数据
+    const updateData: Record<string, any> = {
       updatedAt: new Date(),
     }
 
-    if (validated.name !== undefined) {
-      dbData.name = validated.name
-    }
-    if (validated.supplierPrice !== undefined) {
-      dbData.supplierPrice = validated.supplierPrice
-    }
-    if (validated.shopPrice !== undefined) {
-      dbData.shopPrice = validated.shopPrice || null
-    }
+    if (validated.name !== undefined) updateData.name = validated.name
+    if (validated.supplierPrice !== undefined) updateData.supplierPrice = validated.supplierPrice
+    if (validated.shopPrice !== undefined) updateData.shopPrice = validated.shopPrice || null
 
+    // 更新数据库
     const [product] = await db
       .update(products)
-      .set(dbData)
+      .set(updateData)
       .where(eq(products.id, id))
       .returning()
+
     return product || null
   }
 
+  /**
+   * 删除产品
+   */
   async deleteProduct(id: string): Promise<boolean> {
-    // 确保数据库已初始化
-    await ensureDbInitialized()
-    
     const db = await getDb()
     const result = await db.delete(products).where(eq(products.id, id))
     return (result.rowCount ?? 0) > 0

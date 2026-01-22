@@ -1,6 +1,6 @@
 import { promises as fs } from 'fs'
 import path from 'path'
-import { productManager } from '@/storage/database/productManager'
+import { productManager, runMigrations, isDatabaseInitialized } from '@/storage/database'
 import type { Product, InsertProduct, UpdateProduct } from '@/storage/database/shared/schema'
 
 // 存储类型
@@ -8,6 +8,28 @@ type StorageType = 'database' | 'file'
 
 // 从环境变量获取存储类型，默认使用数据库
 const STORAGE_TYPE: StorageType = (process.env.STORAGE_TYPE as StorageType) || 'database'
+
+// 数据库初始化标志
+let dbInitialized = false
+
+/**
+ * 确保数据库已初始化
+ */
+async function ensureDatabaseReady(): Promise<void> {
+  if (dbInitialized) return
+
+  try {
+    const isInit = await isDatabaseInitialized()
+    if (!isInit) {
+      console.log('[Storage] 首次使用，初始化数据库...')
+      await runMigrations()
+    }
+    dbInitialized = true
+  } catch (error) {
+    console.error('[Storage] 数据库初始化失败:', error)
+    throw error
+  }
+}
 
 // 文件存储路径
 const DATA_DIR = '/tmp/data'
@@ -100,7 +122,7 @@ export class ProductStorageAdapter {
    */
   async createProduct(data: InsertProduct): Promise<Product> {
     if (this.storageType === 'database') {
-      // 使用数据库存储
+      await ensureDatabaseReady()
       return productManager.createProduct(data)
     } else {
       // 使用文件存储
@@ -130,7 +152,7 @@ export class ProductStorageAdapter {
     search?: string
   } = {}): Promise<Product[]> {
     if (this.storageType === 'database') {
-      // 使用数据库存储
+      await ensureDatabaseReady()
       return productManager.getProducts(options)
     } else {
       // 使用文件存储
@@ -159,6 +181,7 @@ export class ProductStorageAdapter {
    */
   async getProductById(id: string): Promise<Product | null> {
     if (this.storageType === 'database') {
+      await ensureDatabaseReady()
       return productManager.getProductById(id)
     } else {
       const products = await readProducts()
@@ -172,6 +195,7 @@ export class ProductStorageAdapter {
    */
   async updateProduct(id: string, data: UpdateProduct): Promise<Product | null> {
     if (this.storageType === 'database') {
+      await ensureDatabaseReady()
       return productManager.updateProduct(id, data)
     } else {
       const products = await readProducts()
@@ -204,6 +228,7 @@ export class ProductStorageAdapter {
    */
   async deleteProduct(id: string): Promise<boolean> {
     if (this.storageType === 'database') {
+      await ensureDatabaseReady()
       return productManager.deleteProduct(id)
     } else {
       const products = await readProducts()
