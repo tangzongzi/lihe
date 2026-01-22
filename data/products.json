@@ -1,0 +1,16 @@
+[
+  {
+    "id": "8c5b7b20-c2dd-4198-b8fb-5fb8ad9a5045",
+    "name": "红色礼盒",
+    "supplierPrice": "50",
+    "shopPrice": "80",
+    "createdAt": "2026-01-22T10:51:52.843Z"
+  },
+  {
+    "id": "fed5c073-aec4-4949-a822-68db02d03cd4",
+    "name": "蓝色礼盒",
+    "supplierPrice": "60",
+    "shopPrice": "90",
+    "createdAt": "2026-01-22T10:51:53.031Z"
+  }
+]
