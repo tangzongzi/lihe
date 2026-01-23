@@ -119,7 +119,7 @@ export async function PATCH(
     if (error instanceof z.ZodError) {
       const response: ApiResponse = {
         success: false,
-        error: error.errors[0].message,
+        error: error.issues[0]?.message || '验证失败',
       }
       return NextResponse.json(response, { status: 400 })
     }

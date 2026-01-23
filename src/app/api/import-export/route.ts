@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
     if (error instanceof z.ZodError) {
       const response: ApiResponse = {
         success: false,
-        error: '数据格式不正确：' + error.errors[0].message,
+        error: '数据格式不正确：' + (error.issues[0]?.message || '验证失败'),
       }
       return NextResponse.json(response, { status: 400 })
     }
