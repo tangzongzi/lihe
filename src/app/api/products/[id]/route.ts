@@ -1,97 +1,179 @@
-import { NextResponse } from 'next/server'
-import { productStorage } from '@/lib/storage-adapter'
+// Edge Runtime 声明（关键！）
+export const runtime = 'edge'
 
-// 更新产品
-export async function PUT(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
+import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
+import { getProductById, updateProduct, deleteProduct } from '@/db/queries'
+import type { ApiResponse, ProductResponse } from '@/lib/api-types'
+
+/**
+ * 更新产品验证 Schema
+ */
+const updateProductSchema = z.object({
+  name: z.string().min(1).max(255).optional(),
+  supplyPrice: z.string().regex(/^\d+(\.\d{1,2})?$/).optional(),
+  shopPrice: z.string().regex(/^\d+(\.\d{1,2})?$/).optional(),
+})
+
+/**
+ * GET /api/products/[id] - 获取单个产品
+ */
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } }
 ) {
   try {
-    const { id } = await params
-    const body = await request.json()
-
-    console.log('PUT: 更新产品请求 - ID:', id, '请求体:', body)
-
-    const product = await productStorage.updateProduct(id, {
-      name: body.name,
-      supplierPrice: body.supplierPrice,
-      shopPrice: body.shopPrice,
-    })
-
+    const id = parseInt(params.id)
+    
+    if (isNaN(id)) {
+      const response: ApiResponse = {
+        success: false,
+        error: '无效的产品 ID',
+      }
+      return NextResponse.json(response, { status: 400 })
+    }
+    
+    const product = await getProductById(id)
+    
     if (!product) {
-      console.error('PUT: 产品不存在 - ID:', id)
-      return NextResponse.json({ error: '产品不存在' }, { status: 404 })
+      const response: ApiResponse = {
+        success: false,
+        error: '产品不存在',
+      }
+      return NextResponse.json(response, { status: 404 })
     }
-
-    // 转换 decimal 字段为字符串
-    const formattedProduct = {
-      ...product,
-      supplierPrice: product.supplierPrice.toString(),
-      shopPrice: product.shopPrice?.toString(),
+    
+    const response: ApiResponse<ProductResponse> = {
+      success: true,
+      data: {
+        ...product,
+        createdAt: product.createdAt.toISOString(),
+        updatedAt: product.updatedAt.toISOString(),
+      },
     }
-
-    console.log('PUT: 更新产品成功:', formattedProduct, '存储方式:', productStorage.getStorageType())
-
-    return NextResponse.json(formattedProduct)
+    
+    return NextResponse.json(response)
   } catch (error) {
-    console.error('PUT: 更新产品失败:', error)
-
-    // 处理 Zod 验证错误
-    if (error && typeof error === 'object' && 'issues' in error) {
-      const issues = (error as any).issues
-      const errorMessages = issues.map((issue: any) => issue.message)
-      console.error('PUT: Zod 验证错误详情:', issues)
-      return NextResponse.json(
-        { error: errorMessages.join(', ') },
-        { status: 400 }
-      )
+    console.error(`[API] GET /api/products/${params.id} 失败:`, error)
+    
+    const response: ApiResponse = {
+      success: false,
+      error: '获取产品失败',
     }
-
-    const errorMessage = error instanceof Error ? error.message : '更新产品失败'
-    console.error('PUT: 详细错误:', {
-      errorMessage,
-      stack: error instanceof Error ? error.stack : undefined
-    })
-
-    return NextResponse.json(
-      { error: errorMessage },
-      { status: 500 }
-    )
+    
+    return NextResponse.json(response, { status: 500 })
   }
 }
 
-// 删除产品
-export async function DELETE(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
+/**
+ * PATCH /api/products/[id] - 更新产品
+ */
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: { id: string } }
 ) {
   try {
-    const { id } = await params
-
-    console.log('DELETE: 删除产品请求 - ID:', id)
-
-    const success = await productStorage.deleteProduct(id)
-
-    if (!success) {
-      console.error('DELETE: 产品不存在 - ID:', id)
-      return NextResponse.json({ error: '产品不存在' }, { status: 404 })
+    const id = parseInt(params.id)
+    
+    if (isNaN(id)) {
+      const response: ApiResponse = {
+        success: false,
+        error: '无效的产品 ID',
+      }
+      return NextResponse.json(response, { status: 400 })
     }
-
-    console.log('DELETE: 删除产品成功 - ID:', id, '存储方式:', productStorage.getStorageType())
-
-    return NextResponse.json({ success: true })
+    
+    const body = await request.json()
+    
+    // Zod 验证
+    const validated = updateProductSchema.parse(body)
+    
+    // 更新产品
+    const product = await updateProduct(id, validated)
+    
+    if (!product) {
+      const response: ApiResponse = {
+        success: false,
+        error: '产品不存在',
+      }
+      return NextResponse.json(response, { status: 404 })
+    }
+    
+    const response: ApiResponse<ProductResponse> = {
+      success: true,
+      data: {
+        ...product,
+        createdAt: product.createdAt.toISOString(),
+        updatedAt: product.updatedAt.toISOString(),
+      },
+      message: '产品更新成功',
+    }
+    
+    return NextResponse.json(response)
   } catch (error) {
-    console.error('DELETE: 删除产品失败:', error)
+    console.error(`[API] PATCH /api/products/${params.id} 失败:`, error)
+    
+    // Zod 验证错误
+    if (error instanceof z.ZodError) {
+      const response: ApiResponse = {
+        success: false,
+        error: error.errors[0].message,
+      }
+      return NextResponse.json(response, { status: 400 })
+    }
+    
+    // 其他错误
+    const response: ApiResponse = {
+      success: false,
+      error: '更新产品失败',
+    }
+    
+    return NextResponse.json(response, { status: 500 })
+  }
+}
 
-    const errorMessage = error instanceof Error ? error.message : '删除产品失败'
-    console.error('DELETE: 详细错误:', {
-      errorMessage,
-      stack: error instanceof Error ? error.stack : undefined
-    })
-
-    return NextResponse.json(
-      { error: errorMessage },
-      { status: 500 }
-    )
+/**
+ * DELETE /api/products/[id] - 删除产品
+ */
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const id = parseInt(params.id)
+    
+    if (isNaN(id)) {
+      const response: ApiResponse = {
+        success: false,
+        error: '无效的产品 ID',
+      }
+      return NextResponse.json(response, { status: 400 })
+    }
+    
+    const success = await deleteProduct(id)
+    
+    if (!success) {
+      const response: ApiResponse = {
+        success: false,
+        error: '产品不存在',
+      }
+      return NextResponse.json(response, { status: 404 })
+    }
+    
+    const response: ApiResponse = {
+      success: true,
+      message: '产品删除成功',
+    }
+    
+    return NextResponse.json(response)
+  } catch (error) {
+    console.error(`[API] DELETE /api/products/${params.id} 失败:`, error)
+    
+    const response: ApiResponse = {
+      success: false,
+      error: '删除产品失败',
+    }
+    
+    return NextResponse.json(response, { status: 500 })
   }
 }

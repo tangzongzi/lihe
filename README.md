@@ -1,33 +1,53 @@
-# 礼盒报价计算器
+# 礼盒报价计算器（EdgeOne Pages 优化版）
 
-一个基于 Next.js 的礼盒报价计算系统，支持产品管理、价格计算、利润分析等功能。
+一个基于 Next.js 的礼盒报价计算系统，**专为腾讯 EdgeOne Pages 平台优化**，完全兼容 Edge Runtime。
 
-## 功能特性
+## ✨ 功能特性
 
 - ✅ **产品管理**：添加、编辑、删除产品信息
 - ✅ **价格计算**：自动计算成本、运费、手续费和利润
 - ✅ **优惠计算**：支持按百分比计算优惠金额
 - ✅ **数据导入导出**：支持 JSON 格式的数据备份和恢复
-- ✅ **文字识别**：通过 OCR 识别产品信息（实验性功能）
-- ✅ **双存储模式**：支持数据库存储和文件存储
+- ✅ **OCR 识别**：通过 Tesseract.js 前端识别产品信息
+- ✅ **Edge Runtime**：完全兼容 EdgeOne Pages 平台
 
-## 技术栈
+## 🚀 技术栈
 
-- **前端框架**：Next.js 16 + React 19
-- **UI 组件**：Radix UI + Tailwind CSS
-- **数据库**：PostgreSQL + Drizzle ORM
-- **表单验证**：Zod
-- **包管理器**：pnpm 9.0.0+
+### 前端
+- Next.js 16 (App Router)
+- React 19
+- TypeScript 5
+- Tailwind CSS 4
+- Radix UI
+- Tesseract.js (OCR)
 
-## 快速开始
+### 后端（Edge Runtime）
+- Next.js API Routes (Edge Runtime)
+- Neon Database Serverless
+- Drizzle ORM
+- Zod 验证
 
-### 1. 安装依赖
+### 部署
+- EdgeOne Pages
+- GitHub 自动部署
+- 环境变量管理
+
+## 📦 快速开始
+
+### 1. 克隆项目
+
+```bash
+git clone https://github.com/tangzongzi/lihe.git
+cd lihe
+```
+
+### 2. 安装依赖
 
 ```bash
 pnpm install
 ```
 
-### 2. 配置环境变量
+### 3. 配置环境变量
 
 复制 `.env.example` 为 `.env`：
 
@@ -35,17 +55,23 @@ pnpm install
 cp .env.example .env
 ```
 
-编辑 `.env` 文件，配置存储方式：
+编辑 `.env` 文件，配置数据库连接：
 
 ```env
-# 使用数据库存储（推荐）
-STORAGE_TYPE=database
-
-# 或使用文件存储（仅用于开发测试）
-# STORAGE_TYPE=file
+DATABASE_URL=postgresql://user:password@host.neon.tech/dbname?sslmode=require
 ```
 
-### 3. 启动开发服务器
+### 4. 初始化数据库
+
+```bash
+# 生成迁移文件
+pnpm db:generate
+
+# 应用迁移到数据库
+pnpm db:push
+```
+
+### 5. 启动开发服务器
 
 ```bash
 pnpm dev
@@ -53,35 +79,30 @@ pnpm dev
 
 访问 [http://localhost:3000](http://localhost:3000) 查看应用。
 
-**注意**：如果使用数据库存储，首次添加产品时会自动创建数据库表。
+## 🗄️ 数据库设置
 
-## 项目结构
+### 使用 Neon Database（推荐）
 
-```
-.
-├── src/
-│   ├── app/                    # Next.js App Router
-│   │   ├── api/               # API 路由
-│   │   │   ├── products/      # 产品 CRUD API
-│   │   │   ├── init-db/       # 数据库初始化
-│   │   │   └── text-recognize/# 文字识别 API
-│   │   └── page.tsx           # 主页面
-│   ├── components/            # React 组件
-│   │   └── ui/               # UI 组件库
-│   ├── storage/              # 数据存储层
-│   │   └── database/         # 数据库相关
-│   │       ├── productManager.ts  # 产品管理器
-│   │       └── shared/
-│   │           └── schema.ts      # 数据库 Schema
-│   └── lib/                  # 工具函数
-│       └── storage-adapter.ts # 存储适配器
-├── public/                   # 静态资源
-├── scripts/                  # 构建脚本
-├── DEPLOYMENT.md            # 部署指南
-└── STORAGE_README.md        # 存储方式说明
+1. 注册 [Neon](https://neon.tech)（免费层可用）
+2. 创建新项目
+3. 获取连接字符串
+4. 配置到 `.env` 文件的 `DATABASE_URL`
+5. 运行 `pnpm db:push` 创建表
+
+### 数据库 Schema
+
+```sql
+CREATE TABLE products (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  supply_price TEXT NOT NULL,
+  shop_price TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
+);
 ```
 
-## 计算规则
+## 📐 计算规则
 
 ### 费用计算
 
@@ -102,59 +123,34 @@ pnpm dev
 - **最大可优惠** = 客户实付 - (商品成本 + 供货商运费) ÷ 0.994
 - 优惠后利润为 0（盈亏平衡点）
 
-## 存储方式
+## 🌐 部署到 EdgeOne Pages
 
-### 数据库存储（推荐）
+### 1. 准备工作
 
-- 数据持久化到 PostgreSQL
-- 支持大规模数据
-- 高性能查询
-- 适合生产环境
+- GitHub 仓库
+- Neon Database 账号和连接字符串
 
-### 文件存储
-
-- 数据存储在 `/tmp/data/products.json`
-- 无需数据库配置
-- 适合开发测试
-- 系统重启后可能丢失数据
-
-详细说明请查看 [STORAGE_README.md](./STORAGE_README.md)
-
-## 部署
-
-### 腾讯 EdgeOne 部署
-
-详细部署步骤请查看 [DEPLOYMENT.md](./DEPLOYMENT.md)
-
-快速部署：
+### 2. 部署步骤
 
 1. 推送代码到 GitHub
-2. 在 EdgeOne 控制台连接仓库
-3. 配置环境变量（`STORAGE_TYPE=database` 和 `PGDATABASE_URL`）
-4. 点击部署
-5. 首次使用时数据库表会自动创建
+2. 在 [EdgeOne Pages 控制台](https://edgeone.ai/pages) 连接仓库
+3. 配置构建设置：
+   - **构建命令**：`pnpm install && pnpm build`
+   - **输出目录**：`.next`
+   - **Node 版本**：18.x 或 20.x
+4. 配置环境变量：
+   - `DATABASE_URL`：你的 Neon 数据库连接字符串
+5. 点击部署
+6. 等待构建完成（约 2-3 分钟）
+7. 访问分配的域名
 
-### Vercel 部署
+### 3. 自动部署
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/tangzongzi/lihe)
+- Git push 自动触发部署
+- 支持预览部署（PR）
+- 支持回滚到历史版本
 
-## 数据备份
-
-### 导出数据
-
-1. 打开应用
-2. 点击"产品库管理"
-3. 点击"导出"按钮
-4. 保存 JSON 文件
-
-### 导入数据
-
-1. 打开应用
-2. 点击"产品库管理"
-3. 点击"导入"按钮
-4. 选择之前导出的 JSON 文件
-
-## 开发
+## 🔧 开发
 
 ### 构建生产版本
 
@@ -180,38 +176,127 @@ pnpm lint
 pnpm ts-check
 ```
 
-## 常见问题
+### 数据库管理
 
-### 1. 添加产品失败
+```bash
+# 生成迁移文件
+pnpm db:generate
+
+# 应用迁移
+pnpm db:push
+
+# 打开 Drizzle Studio（数据库 GUI）
+pnpm db:studio
+```
+
+## 📁 项目结构
+
+```
+.
+├── src/
+│   ├── app/                    # Next.js App Router
+│   │   ├── api/               # API 路由（Edge Runtime）
+│   │   │   ├── products/      # 产品 CRUD API
+│   │   │   ├── calculate/     # 价格计算 API
+│   │   │   └── import-export/ # 导入导出 API
+│   │   ├── layout.tsx         # 全局布局
+│   │   └── page.tsx           # 主页面
+│   ├── components/            # React 组件
+│   │   └── ui/               # UI 组件库
+│   ├── db/                   # 数据库层
+│   │   ├── client.ts         # Neon 客户端
+│   │   ├── schema.ts         # 数据库 Schema
+│   │   └── queries.ts        # 查询函数
+│   └── lib/                  # 工具函数
+│       ├── api-types.ts      # API 类型定义
+│       └── ocr.ts            # OCR 处理
+├── drizzle/                  # 数据库迁移文件
+├── .env.example              # 环境变量示例
+├── drizzle.config.ts         # Drizzle 配置
+└── package.json              # 依赖配置
+```
+
+## 🔑 环境变量
+
+```env
+# 数据库连接（必填）
+DATABASE_URL=postgresql://user:password@host.neon.tech/dbname?sslmode=require
+
+# 可选配置
+NODE_ENV=production
+NEXT_PUBLIC_APP_URL=https://your-domain.edgeone.app
+```
+
+## 🎯 Edge Runtime 兼容性
+
+本项目完全兼容 Edge Runtime，遵循以下原则：
+
+- ✅ 所有 API 路由声明 `export const runtime = 'edge'`
+- ✅ 使用 `@neondatabase/serverless` 连接数据库
+- ✅ 避免使用 Node.js 特定模块（fs, path, crypto）
+- ✅ 使用 Web 标准 API
+- ✅ 包体积 < 2MB
+
+## 📸 OCR 识别功能
+
+### 使用方法
+
+1. 点击"添加产品"按钮
+2. 上传产品图片或粘贴图片（Ctrl+V）
+3. 点击"识别"按钮
+4. 自动填充产品名称和价格
+5. 手动调整识别结果
+6. 保存产品
+
+### 识别规则
+
+- **产品名称**：提取第一行包含中文的较长文字
+- **价格**：识别 ¥ 符号、"元"字、"供货价"关键词附近的数字
+- **规格**：识别包含 * 或 × 以及 g 或 克的行
+
+### 优化建议
+
+- 使用清晰的图片
+- 文字水平排列
+- 背景简单干净
+- 光线充足
+
+## 🐛 常见问题
+
+### 1. 数据库连接失败
 
 **解决方案**：
-- 检查数据库连接是否正常
-- 查看浏览器控制台和服务器日志
-- 首次使用时数据库表会自动创建，可能需要几秒钟
-
-### 2. 数据丢失
-
-**解决方案**：
-- 如果使用文件存储，定期导出备份
-- 推荐使用数据库存储以确保数据持久化
-- 配置数据库自动备份
-
-### 3. 部署后无法连接数据库
-
-**解决方案**：
-- 检查环境变量 `DATABASE_URL` 是否正确
-- 确保数据库允许来自部署平台的连接
+- 检查 `DATABASE_URL` 环境变量是否正确
+- 确保数据库允许来自 EdgeOne 的连接
 - 检查数据库用户权限
 
-## 贡献
+### 2. 构建失败
 
-欢迎提交 Issue 和 Pull Request！
+**解决方案**：
+- 运行 `pnpm install` 重新安装依赖
+- 检查 Node 版本（需要 18.x 或 20.x）
+- 查看构建日志中的错误信息
 
-## 许可证
+### 3. OCR 识别不准确
+
+**解决方案**：
+- 使用更清晰的图片
+- 确保文字水平排列
+- 提高图片对比度
+- 手动调整识别结果
+
+## 📄 许可证
 
 MIT License
 
-## 联系方式
+## 🔗 相关链接
+
+- [EdgeOne Pages 文档](https://edgeone.ai/pages)
+- [Neon Database 文档](https://neon.tech/docs)
+- [Next.js 文档](https://nextjs.org/docs)
+- [Drizzle ORM 文档](https://orm.drizzle.team)
+
+## 📞 联系方式
 
 - GitHub: [tangzongzi/lihe](https://github.com/tangzongzi/lihe)
 - 问题反馈: [Issues](https://github.com/tangzongzi/lihe/issues)
