@@ -78,22 +78,29 @@ export default function GiftBoxCalculator() {
     setIsAdding(true);
 
     try {
-      console.log('开始添加产品，请求数据:', {
+      // 构建请求数据，只在有值时包含 shopPrice
+      const requestData: {
+        name: string;
+        supplyPrice: string;
+        shopPrice?: string;
+      } = {
         name: addProductForm.name.trim(),
-        supplierPrice: addProductForm.supplierPrice.trim(),
-        shopPrice: addProductForm.shopPrice.trim() || undefined,
-      });
+        supplyPrice: addProductForm.supplierPrice.trim(),
+      };
+
+      // 只在有值时添加 shopPrice
+      if (addProductForm.shopPrice.trim()) {
+        requestData.shopPrice = addProductForm.shopPrice.trim();
+      }
+
+      console.log('开始添加产品，请求数据:', requestData);
 
       const response = await fetch('/api/products', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          name: addProductForm.name.trim(),
-          supplierPrice: addProductForm.supplierPrice.trim(),
-          shopPrice: addProductForm.shopPrice.trim() || undefined,
-        }),
+        body: JSON.stringify(requestData),
       });
 
       console.log('添加产品响应状态:', {
@@ -498,16 +505,27 @@ export default function GiftBoxCalculator() {
     setIsUpdatingProduct(true);
 
     try {
+      // 构建请求数据，只在有值时包含 shopPrice
+      const requestData: {
+        name: string;
+        supplyPrice: string;
+        shopPrice?: string;
+      } = {
+        name: editProductName.trim(),
+        supplyPrice: editProductPrice.trim(),
+      };
+
+      // 只在有值时添加 shopPrice
+      if (editProductShopPrice.trim()) {
+        requestData.shopPrice = editProductShopPrice.trim();
+      }
+
       const response = await fetch(`/api/products/${editingProductId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          name: editProductName.trim(),
-          supplierPrice: editProductPrice.trim(),
-          shopPrice: editProductShopPrice.trim() || undefined,
-        }),
+        body: JSON.stringify(requestData),
       });
 
       if (response.ok) {
