@@ -63,6 +63,8 @@ export default function GiftBoxCalculator() {
   // 文字识别状态
   const [recognitionText, setRecognitionText] = useState('');
   const [isRecognizing, setIsRecognizing] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>('');
 
   useEffect(() => {
     loadProducts();
@@ -112,6 +114,7 @@ export default function GiftBoxCalculator() {
           setProducts([...products, newProduct]);
           setAddProductForm({ name: '', supplierPrice: '', shopPrice: '' });
           setRecognitionText('');
+          clearImage();
           setIsAddProductOpen(false);
           alert('产品添加成功！');
         } else {
@@ -149,58 +152,203 @@ export default function GiftBoxCalculator() {
     }
   };
 
-  // 文字识别功能
-  const handleRecognizeText = async () => {
-    if (!recognitionText.trim()) {
-      alert('请输入或粘贴产品文字信息');
+  // 图片上传处理
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setSelectedImage(file);
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setImagePreview(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // 图片粘贴处理
+  const handleImagePaste = async (event: React.ClipboardEvent) => {
+    const items = event.clipboardData?.items;
+    if (!items) return;
+
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf('image') !== -1) {
+        const file = items[i].getAsFile();
+        if (file) {
+          setSelectedImage(file);
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            setImagePreview(e.target?.result as string);
+          };
+          reader.readAsDataURL(file);
+        }
+        break;
+      }
+    }
+  };
+
+  // 清除图片
+  const clearImage = () => {
+    setSelectedImage(null);
+    setImagePreview('');
+  };
+
+  // 图片 OCR 识别功能
+  const handleRecognizeImage = async () => {
+    if (!selectedImage && !recognitionText.trim()) {
+      alert('请上传图片、粘贴图片或输入文字');
       return;
     }
 
     setIsRecognizing(true);
 
     try {
-      console.log('开始识别文字:', recognitionText);
-      
-      const response = await fetch('/api/text-recognize', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ text: recognitionText }),
-      });
+      let textToProcess = recognitionText;
 
-      console.log('识别响应状态:', response.status, response.statusText);
+      // 如果有图片,使用 Tesseract.js 识别
+      if (selectedImage) {
+        console.log('开始 OCR 识别图片...');
+        
+        // 动态导入 Tesseract.js
+        const Tesseract = (await import('tesseract.js')).default;
+        
+        const { data } = await Tesseract.recognize(
+          selectedImage,
+          'chi_sim+eng', // 中文简体 + 英文
+          {
+            logger: (m) => {
+              if (m.status === 'recognizing text') {
+                console.log(`OCR 进度: ${Math.round(m.progress * 100)}%`);
+              }
+            },
+          }
+        );
 
-      if (response.ok) {
-        const result = await response.json();
-        console.log('识别结果:', result);
-        
-        let hasData = false;
-        
-        if (result.title) {
-          setAddProductForm(prev => ({ ...prev, name: result.title }));
-          hasData = true;
-        }
-        if (result.price) {
-          setAddProductForm(prev => ({ ...prev, supplierPrice: result.price }));
-          hasData = true;
-        }
-        
-        if (hasData) {
-          alert('识别成功！已自动填充产品信息');
-        } else {
-          alert('未能识别出产品信息，请检查文字格式或手动填写');
-        }
+        textToProcess = data.text;
+        console.log('OCR 识别结果:', textToProcess);
+        setRecognitionText(textToProcess);
+      }
+
+      // 提取产品信息
+      console.log('开始提取产品信息:', textToProcess);
+      const productInfo = extractProductInfo(textToProcess);
+      console.log('提取结果:', productInfo);
+
+      let hasData = false;
+
+      if (productInfo.title) {
+        setAddProductForm(prev => ({ ...prev, name: productInfo.title }));
+        hasData = true;
+      }
+      if (productInfo.price) {
+        setAddProductForm(prev => ({ ...prev, supplierPrice: productInfo.price }));
+        hasData = true;
+      }
+
+      if (hasData) {
+        alert('识别成功！已自动填充产品信息');
       } else {
-        const errorData = await response.json().catch(() => ({ error: '服务器错误' }));
-        console.error('识别失败:', errorData);
-        alert(`识别失败：${errorData.error || '请稍后重试'}`);
+        alert('未能识别出产品信息，请检查图片或文字格式，或手动填写');
       }
     } catch (error) {
-      console.error('文字识别失败:', error);
-      alert(`文字识别失败：${error instanceof Error ? error.message : '网络错误'}`);
+      console.error('识别失败:', error);
+      alert(`识别失败：${error instanceof Error ? error.message : '未知错误'}`);
     } finally {
       setIsRecognizing(false);
+    }
+  };
+
+  // 前端提取产品信息的函数
+  const extractProductInfo = (text: string) => {
+    try {
+      console.log('[Extract] 开始提取，原始文字:', text);
+
+      const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+      console.log('[Extract] 分割后行数:', lines.length);
+
+      let title = null;
+      let spec = null;
+      let price = null;
+
+      // 规则1: 提取标题 - 通常是第一行最长的文字
+      for (const line of lines) {
+        // 跳过明显的非标题行
+        if (line.includes('¥') || line.includes('元') || /^\d+$/.test(line)) {
+          continue;
+        }
+        // 标题通常较长且包含中文
+        if (line.length > 5 && /[\u4e00-\u9fa5]/.test(line)) {
+          title = line;
+          console.log('[Extract] 找到标题:', title);
+          break;
+        }
+      }
+
+      // 规则2: 提取价格
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+
+        // 匹配 ¥ 符号后的价格
+        const priceMatch = line.match(/¥\s*([\d.]+)/);
+        if (priceMatch) {
+          price = priceMatch[1];
+          console.log('[Extract] 找到价格（¥符号）:', price);
+          break;
+        }
+
+        // 匹配"元"前的价格
+        const yuanMatch = line.match(/([\d.]+)\s*元/);
+        if (yuanMatch) {
+          price = yuanMatch[1];
+          console.log('[Extract] 找到价格（元）:', price);
+          break;
+        }
+
+        // 匹配"供货价"相关
+        if (line.includes('供货价') || line.includes('价格')) {
+          const currentPrice = line.match(/([\d.]+)/);
+          if (currentPrice) {
+            price = currentPrice[1];
+            console.log('[Extract] 找到价格（供货价）:', price);
+            break;
+          }
+
+          // 在下一行查找
+          if (i + 1 < lines.length) {
+            const nextLine = lines[i + 1];
+            const nextPrice = nextLine.match(/([\d.]+)/);
+            if (nextPrice) {
+              price = nextPrice[1];
+              console.log('[Extract] 找到价格（下一行）:', price);
+              break;
+            }
+          }
+        }
+      }
+
+      // 规则3: 提取规格
+      for (const line of lines) {
+        if ((line.includes('*') || line.includes('×')) && (line.includes('g') || line.includes('克'))) {
+          spec = line;
+          console.log('[Extract] 找到规格:', spec);
+          break;
+        }
+      }
+
+      const result = {
+        title: title || null,
+        spec: spec || null,
+        price: price || null,
+      };
+
+      console.log('[Extract] 最终提取结果:', result);
+      return result;
+    } catch (error) {
+      console.error('[Extract] 提取过程出错:', error);
+      return {
+        title: null,
+        spec: null,
+        price: null,
+      };
     }
   };
 
@@ -1308,26 +1456,89 @@ export default function GiftBoxCalculator() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-5 py-4">
-            {/* 文字识别区域 */}
+            {/* 图片/文字识别区域 */}
             <div className="space-y-3">
               <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                文字识别（可选）
+                智能识别（可选）
               </Label>
-              <div className="relative">
-                <textarea
-                  placeholder="粘贴产品文字，例如：&#10;百草味坚果有礼（臻选礼）1075g坚果零食礼盒&#10;规格：坚果有礼-臻选礼1075g*1盒&#10;供货价：¥39.00"
-                  value={recognitionText}
-                  onChange={(e) => setRecognitionText(e.target.value)}
-                  className="w-full h-32 p-3 border border-gray-200 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white"
-                />
+              
+              {/* 图片上传区域 */}
+              <div className="space-y-3">
+                <div 
+                  className="relative border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-4 hover:border-gray-400 dark:hover:border-gray-600 transition-colors"
+                  onPaste={handleImagePaste}
+                >
+                  {imagePreview ? (
+                    <div className="relative">
+                      <img 
+                        src={imagePreview} 
+                        alt="预览" 
+                        className="max-h-48 mx-auto rounded-lg"
+                      />
+                      <button
+                        onClick={clearImage}
+                        className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-1.5 shadow-lg transition-colors"
+                        type="button"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="text-center">
+                      <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                        <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                      <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                        <label htmlFor="image-upload" className="cursor-pointer text-blue-600 dark:text-blue-400 hover:text-blue-500 font-medium">
+                          点击上传图片
+                        </label>
+                        <span> 或 </span>
+                        <span className="text-gray-500">Ctrl+V 粘贴图片</span>
+                      </div>
+                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-600">
+                        支持 PNG, JPG, JPEG 格式
+                      </p>
+                    </div>
+                  )}
+                  <input
+                    id="image-upload"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                  />
+                </div>
+
+                {/* 文字输入区域 */}
+                <div className="relative">
+                  <textarea
+                    placeholder="或者直接粘贴产品文字，例如：&#10;百草味坚果有礼（臻选礼）1075g坚果零食礼盒&#10;规格：坚果有礼-臻选礼1075g*1盒&#10;供货价：¥39.00"
+                    value={recognitionText}
+                    onChange={(e) => setRecognitionText(e.target.value)}
+                    className="w-full h-24 p-3 border border-gray-200 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white"
+                  />
+                </div>
+
+                <Button
+                  onClick={handleRecognizeImage}
+                  disabled={isRecognizing || (!selectedImage && !recognitionText.trim())}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium h-10"
+                >
+                  {isRecognizing ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      识别中...
+                    </span>
+                  ) : (
+                    '🔍 智能识别产品信息'
+                  )}
+                </Button>
               </div>
-              <Button
-                onClick={handleRecognizeText}
-                disabled={isRecognizing || !recognitionText.trim()}
-                className="w-full bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-800 font-medium h-10"
-              >
-                {isRecognizing ? '识别中...' : '识别产品信息'}
-              </Button>
             </div>
 
             <div className="border-t border-gray-200 dark:border-gray-800"></div>
@@ -1385,6 +1596,7 @@ export default function GiftBoxCalculator() {
                   setIsAddProductOpen(false);
                   setAddProductForm({ name: '', supplierPrice: '', shopPrice: '' });
                   setRecognitionText('');
+                  clearImage();
                 }}
                 className="flex-1 h-10 border border-gray-300 dark:border-gray-700"
               >
