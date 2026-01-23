@@ -110,23 +110,35 @@ function extractProductInfo(text: string) {
 export async function POST(request: Request) {
   try {
     console.log('[Text Recognize] 开始处理识别请求');
+    console.log('[Text Recognize] 请求方法:', request.method);
+    console.log('[Text Recognize] 请求头:', Object.fromEntries(request.headers.entries()));
     
-    const body = await request.json();
-    console.log('[Text Recognize] 请求体:', body);
+    let body;
+    try {
+      body = await request.json();
+      console.log('[Text Recognize] 请求体解析成功:', body);
+    } catch (parseError: any) {
+      console.error('[Text Recognize] 请求体解析失败:', parseError);
+      return NextResponse.json(
+        { error: '请求数据格式错误，请确保发送的是有效的 JSON', success: false },
+        { status: 400 }
+      );
+    }
     
     const { text } = body;
 
     if (!text) {
       console.log('[Text Recognize] 错误: 文字内容为空');
-      return NextResponse.json({ error: '请提供文字内容' }, { status: 400 });
+      return NextResponse.json({ error: '请提供文字内容', success: false }, { status: 400 });
     }
 
     if (typeof text !== 'string') {
       console.log('[Text Recognize] 错误: 文字格式不正确，类型:', typeof text);
-      return NextResponse.json({ error: '文字格式不正确' }, { status: 400 });
+      return NextResponse.json({ error: '文字格式不正确', success: false }, { status: 400 });
     }
 
     console.log('[Text Recognize] 开始提取产品信息，文字长度:', text.length);
+    console.log('[Text Recognize] 文字内容预览:', text.substring(0, 100));
     
     // 使用规则提取产品信息
     const productInfo = extractProductInfo(text);
@@ -139,11 +151,14 @@ export async function POST(request: Request) {
     });
   } catch (error: any) {
     console.error('[Text Recognize] 识别失败:', error);
+    console.error('[Text Recognize] 错误类型:', error?.constructor?.name);
+    console.error('[Text Recognize] 错误消息:', error?.message);
     console.error('[Text Recognize] 错误堆栈:', error?.stack);
     
     return NextResponse.json(
       { 
         error: `文字识别失败: ${error?.message || '未知错误'}`,
+        details: process.env.NODE_ENV === 'development' ? error?.stack : undefined,
         success: false,
       },
       { status: 500 }
