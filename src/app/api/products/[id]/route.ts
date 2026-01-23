@@ -20,10 +20,11 @@ const updateProductSchema = z.object({
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = parseInt(params.id)
+    const { id: idStr } = await params
+    const id = parseInt(idStr)
     
     if (isNaN(id)) {
       const response: ApiResponse = {
@@ -54,7 +55,7 @@ export async function GET(
     
     return NextResponse.json(response)
   } catch (error) {
-    console.error(`[API] GET /api/products/${params.id} 失败:`, error)
+    console.error(`[API] GET /api/products/[id] 失败:`, error)
     
     const response: ApiResponse = {
       success: false,
@@ -70,10 +71,11 @@ export async function GET(
  */
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = parseInt(params.id)
+    const { id: idStr } = await params
+    const id = parseInt(idStr)
     
     if (isNaN(id)) {
       const response: ApiResponse = {
@@ -111,7 +113,7 @@ export async function PATCH(
     
     return NextResponse.json(response)
   } catch (error) {
-    console.error(`[API] PATCH /api/products/${params.id} 失败:`, error)
+    console.error(`[API] PATCH /api/products/[id] 失败:`, error)
     
     // Zod 验证错误
     if (error instanceof z.ZodError) {
@@ -137,10 +139,11 @@ export async function PATCH(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = parseInt(params.id)
+    const { id: idStr } = await params
+    const id = parseInt(idStr)
     
     if (isNaN(id)) {
       const response: ApiResponse = {
@@ -167,7 +170,7 @@ export async function DELETE(
     
     return NextResponse.json(response)
   } catch (error) {
-    console.error(`[API] DELETE /api/products/${params.id} 失败:`, error)
+    console.error(`[API] DELETE /api/products/[id] 失败:`, error)
     
     const response: ApiResponse = {
       success: false,
