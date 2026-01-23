@@ -89,8 +89,8 @@ function toFileProduct(product: Product): FileProduct {
     name: product.name,
     supplierPrice: product.supplierPrice.toString(),
     shopPrice: product.shopPrice?.toString(),
-    createdAt: product.createdAt,
-    updatedAt: product.updatedAt || undefined,
+    createdAt: product.createdAt.toISOString(),
+    updatedAt: product.updatedAt?.toISOString(),
   }
 }
 
