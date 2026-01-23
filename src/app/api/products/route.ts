@@ -55,18 +55,53 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
+    // 1. 读取请求体
+    let body
+    try {
+      body = await request.json()
+      console.log('[API] 接收到的请求数据:', body)
+    } catch (parseError) {
+      console.error('[API] JSON 解析失败:', parseError)
+      return NextResponse.json({
+        success: false,
+        error: 'JSON 格式错误',
+      }, { status: 400 })
+    }
     
-    // Zod 验证
-    const validated = createProductSchema.parse(body)
+    // 2. Zod 验证
+    let validated
+    try {
+      validated = createProductSchema.parse(body)
+      console.log('[API] 验证通过:', validated)
+    } catch (validationError) {
+      if (validationError instanceof z.ZodError) {
+        console.error('[API] 验证失败:', validationError.issues)
+        return NextResponse.json({
+          success: false,
+          error: validationError.issues[0]?.message || '验证失败',
+        }, { status: 400 })
+      }
+      throw validationError
+    }
     
-    // 创建产品
-    const product = await createProduct({
-      name: validated.name,
-      supplyPrice: validated.supplyPrice,
-      shopPrice: validated.shopPrice || null,
-    })
+    // 3. 创建产品
+    let product
+    try {
+      product = await createProduct({
+        name: validated.name,
+        supplyPrice: validated.supplyPrice,
+        shopPrice: validated.shopPrice || null,
+      })
+      console.log('[API] 产品创建成功:', product)
+    } catch (dbError) {
+      console.error('[API] 数据库错误:', dbError)
+      return NextResponse.json({
+        success: false,
+        error: dbError instanceof Error ? dbError.message : '数据库操作失败',
+      }, { status: 500 })
+    }
     
+    // 4. 返回响应
     const response: ApiResponse<ProductResponse> = {
       success: true,
       data: {
@@ -77,25 +112,16 @@ export async function POST(request: NextRequest) {
       message: '产品创建成功',
     }
     
+    console.log('[API] 返回响应:', response)
     return NextResponse.json(response, { status: 201 })
   } catch (error) {
-    console.error('[API] POST /api/products 失败:', error)
+    console.error('[API] POST /api/products 未捕获错误:', error)
     
-    // Zod 验证错误
-    if (error instanceof z.ZodError) {
-      const response: ApiResponse = {
-        success: false,
-        error: error.issues[0]?.message || '验证失败',
-      }
-      return NextResponse.json(response, { status: 400 })
-    }
-    
-    // 其他错误
-    const response: ApiResponse = {
+    // 确保总是返回 JSON 响应
+    return NextResponse.json({
       success: false,
       error: error instanceof Error ? error.message : '创建产品失败',
-    }
-    
-    return NextResponse.json(response, { status: 500 })
+      stack: error instanceof Error ? error.stack : undefined,
+    }, { status: 500 })
   }
 }
