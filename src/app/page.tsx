@@ -109,14 +109,19 @@ export default function GiftBoxCalculator() {
         console.log('响应Content-Type:', contentType);
         
         if (contentType && contentType.includes('application/json')) {
-          const newProduct = await response.json();
-          console.log('添加产品成功，返回数据:', newProduct);
-          setProducts([...products, newProduct]);
-          setAddProductForm({ name: '', supplierPrice: '', shopPrice: '' });
-          setRecognitionText('');
-          clearImage();
-          setIsAddProductOpen(false);
-          alert('产品添加成功！');
+          const result = await response.json();
+          console.log('添加产品成功，返回数据:', result);
+          
+          if (result.success && result.data) {
+            setProducts([...products, result.data]);
+            setAddProductForm({ name: '', supplierPrice: '', shopPrice: '' });
+            setRecognitionText('');
+            clearImage();
+            setIsAddProductOpen(false);
+            alert('产品添加成功！');
+          } else {
+            alert(`添加产品失败：${result.error || '未知错误'}`);
+          }
         } else {
           const errorText = await response.text();
           console.error('添加产品失败 - 响应不是JSON格式:', errorText);
@@ -472,8 +477,10 @@ export default function GiftBoxCalculator() {
       if (response.ok) {
         const contentType = response.headers.get('content-type');
         if (contentType && contentType.includes('application/json')) {
-          const data = await response.json();
-          setProducts(data);
+          const result = await response.json();
+          if (result.success && result.data) {
+            setProducts(result.data);
+          }
         } else {
           const errorText = await response.text();
           console.error('加载产品失败 - 非 JSON 响应:', {
