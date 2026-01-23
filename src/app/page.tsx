@@ -236,11 +236,11 @@ export default function GiftBoxCalculator() {
       let hasData = false;
 
       if (productInfo.title) {
-        setAddProductForm(prev => ({ ...prev, name: productInfo.title }));
+        setAddProductForm(prev => ({ ...prev, name: productInfo.title || '' }));
         hasData = true;
       }
       if (productInfo.price) {
-        setAddProductForm(prev => ({ ...prev, supplierPrice: productInfo.price }));
+        setAddProductForm(prev => ({ ...prev, supplierPrice: productInfo.price || '' }));
         hasData = true;
       }
 
